@@ -53,6 +53,7 @@ mini-tmd-cloud/
 ├── docker-compose.yml     # shared blueprint: db + orthanc
 ├── onboard.ps1            # onboarding script: one command per customer
 ├── explore_dicom.py       # reads DICOM header fields with pydicom
+├── load_dicom.py          # turns 144 sample DICOM headers into load.sql
 ├── customers/             # one settings file per customer (git-ignored)
 │   ├── klinik-a.env
 │   └── praxis-b.env
@@ -131,6 +132,49 @@ python explore_dicom.py
 
 Optional fields such as `BodyPartExamined` are read with `ds.get(..., "UNKNOWN")`, because not every file contains them.
 
+### Loading DICOM metadata into PostgreSQL
+
+`load_dicom.py` scans all sample files that ship with `pydicom` (176 files, 144 of them DICOM objects with a modality). It writes one `INSERT` per file into `load.sql`, which is then loaded into the customer's database.
+
+Because the database port is not exposed, the script generates SQL instead of connecting directly. This also lets you review the changes before applying them.
+
+1. Create the table (once per customer):
+   ```sql
+   CREATE TABLE studies (
+       id SERIAL PRIMARY KEY,
+       patient_id TEXT,
+       modality TEXT,
+       study_date DATE,
+       body_part TEXT
+   );
+   ```
+2. Generate the SQL:
+   ```powershell
+   python load_dicom.py
+   ```
+3. Load it into Klinik A's database:
+   ```powershell
+   Get-Content load.sql | docker compose -p klinik-a --env-file customers/klinik-a.env exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+   ```
+
+These are the details the script handles:
+
+- DICOM dates (`YYYYMMDD`) are converted to SQL dates (`YYYY-MM-DD`).
+- A missing date is stored as `NULL`. 9 of the 144 files have no date.
+- Single quotes in values are escaped (`'` becomes `''`).
+- Unreadable files, and files without a modality, are skipped instead of crashing the run.
+
+Result: **144 studies** across 12 modalities (CT 64, MR 27, OT 23, RTDOSE 7, US 5, NM 4, RTPLAN 4, CR 3, SR 3, SEG 2, ECG 1, RTSTRUCT 1), with study dates from 1995 to 2020.
+
+Example report (studies per modality):
+
+```sql
+SELECT modality, COUNT(*) AS studies
+FROM studies
+GROUP BY modality
+ORDER BY studies DESC;
+```
+
 ---
 
 ## Troubleshooting
@@ -153,8 +197,8 @@ These are real problems I ran into while building this project:
 ## Roadmap
 
 - [ ] Download the Orthanc image and run the full stack end to end (upload a sample CT, view it in the Stone Web Viewer)
-- [ ] `studies` table in PostgreSQL plus a script that loads DICOM metadata into it
-- [ ] SQL reports, e.g. studies per modality and studies per day
+- [x] `studies` table in PostgreSQL plus a script that loads DICOM metadata into it
+- [ ] More SQL reports, e.g. studies per year and a data-quality check (missing dates and body parts)
 - [ ] `onboard.ps1`: check that the customer file exists, start the environment with `up -d`, and print the URL
 - [ ] Health-check script and a GitHub Actions workflow that validates the compose file
 - [ ] HL7 example: match an order message to a DICOM study
