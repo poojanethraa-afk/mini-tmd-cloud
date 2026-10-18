@@ -12,7 +12,32 @@ services:
             interval: 5s
             timeout: 5s
             retries: 10
+          
+    orthanc:  
+        image: orthancteam/orthanc:26.9.1
+        depends_on:
+            db: 
+                condition: service_healthy
+        ports:
+            - "${ORTHANC_HTTP_PORT}:8042"
+            - "${ORTHANC_DICOM_PORT}:4242"
+        environment:
+            POSTGRESQL_PLUGIN_ENABLED: 'true'
+            ORTHANC__POSTGRESQL__HOST: db
+            ORTHANC__POSTGRESQL__USERNAME: ${POSTGRES_USER}
+            ORTHANC__POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+            ORTHANC__POSTGRESQL__DATABASE: ${POSTGRES_DB}
+            ORTHANC__REGISTERED_USERS: '{"admin": "${ORTHANC_PASSWORD}"}'
+            STONE_WEB_VIEWER_PLUGIN_ENABLED: 'true'
+
+        volumes:
+           - orthanc-storage:/var/lib/orthanc/db
+
+
+
+
 
 
 volumes:
     pgdata:
+    orthanc-storage:
