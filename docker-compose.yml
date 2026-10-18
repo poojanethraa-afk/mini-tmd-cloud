@@ -29,6 +29,7 @@ services:
             ORTHANC__POSTGRESQL__DATABASE: ${POSTGRES_DB}
             ORTHANC__REGISTERED_USERS: '{"admin": "${ORTHANC_PASSWORD}"}'
             STONE_WEB_VIEWER_PLUGIN_ENABLED: 'true'
+            DICOM_WEB_PLUGIN_ENABLED: 'true'
 
         volumes:
            - orthanc-storage:/var/lib/orthanc/db

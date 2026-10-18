@@ -32,7 +32,7 @@ I built it to learn the day-to-day work of a Customer Implementation Engineer: s
 | Component | Role |
 |---|---|
 | `db`: PostgreSQL 18 | Stores Orthanc's **index** (patients, studies, series, instances). It's only reachable inside the project network. |
-| `orthanc`: `orthancteam/orthanc:26.9.1` | The PACS. It receives DICOM on port 4242 and serves the web UI, REST API and Stone Web Viewer on port 8042. |
+| `orthanc`: `orthancteam/orthanc:26.9.1` | The PACS. It receives DICOM on port 4242 and serves the web UI (Orthanc Explorer 2), REST API, DICOMweb and Stone Web Viewer on port 8042. |
 | `pgdata` volume | Keeps the database files across container restarts |
 | `orthanc-storage` volume | Holds the DICOM files themselves. The index lives in the database and the image files live on storage. |
 
@@ -190,13 +190,14 @@ These are real problems I ran into while building this project:
 | `… is missing a mount target` | A space after the colon (`name: /path`) makes YAML read the item as a mapping | Write `name:/path` with no space |
 | Orthanc ignores a database setting | Wrong env var name. Orthanc uses `__` for each nesting level (`ORTHANC__POSTGRESQL__HOST`) and `_` between words of one setting (`ORTHANC__REGISTERED_USERS`) | Check the variable names against the Orthanc Docker documentation |
 | Database login fails although the password is correct | A space after `=` in a `.env` file becomes part of the value | Write `NAME=value` with no spaces |
+| Orthanc exits right after "Orthanc has started" (exit code 139) | The log shows `The Stone Web viewer requires the DICOMweb plugin to be installed` | Also set `DICOM_WEB_PLUGIN_ENABLED: 'true'`. The viewer loads its images through DICOMweb. |
 | `port is already allocated` | Two customers use the same host port | Give each customer unique ports |
 
 ---
 
 ## Roadmap
 
-- [ ] Download the Orthanc image and run the full stack end to end (upload a sample CT, view it in the Stone Web Viewer)
+- [x] Run the full stack end to end: upload a sample CT and MR to Klinik A, then view them in the Stone Web Viewer
 - [x] `studies` table in PostgreSQL plus a script that loads DICOM metadata into it
 - [ ] More SQL reports, e.g. studies per year and a data-quality check (missing dates and body parts)
 - [ ] `onboard.ps1`: check that the customer file exists, start the environment with `up -d`, and print the URL
